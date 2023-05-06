@@ -8,7 +8,7 @@ on:
       - 'master'
 
 jobs:
-  build-ee-image:
+  build-exporter-image:
     runs-on: ubuntu-latest
 
     steps:
