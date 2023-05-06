@@ -1,0 +1,49 @@
+name: Build and push Nextcloud Operator image
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - 'master'
+
+jobs:
+  build-ee-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ghcr.io/thedatabaseme/wal-g-exporter
+          flavor: latest=true
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+
+      - name: Login to image repository
+        if: github.ref_type == 'tag'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Build operator image
+        run: |
+          make docker-build VERSION=${{github.ref_name}}
+
+      - name: Push operator image
+        if: github.ref_type == 'tag'
+        run: |
+          make docker-push VERSION=${{github.ref_name}}
+
+      - name: Build and push latest image
+        if: github.ref_type == 'tag'
+        run: |
+          make docker-build docker-push IMG=ghcr.io/thedatabaseme/wal-g-exporter:latest
