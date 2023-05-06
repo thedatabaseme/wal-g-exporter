@@ -1,4 +1,4 @@
-name: Build and push Nextcloud Operator image
+name: Build and push wal-g-exporter image
 
 on:
   push:
