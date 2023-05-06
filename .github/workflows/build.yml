@@ -32,16 +32,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build operator image
-        run: |
-          make docker-build VERSION=${{github.ref_name}}
-
-      - name: Push operator image
-        if: github.ref_type == 'tag'
-        run: |
-          make docker-push VERSION=${{github.ref_name}}
-
-      - name: Build and push latest image
-        if: github.ref_type == 'tag'
-        run: |
-          make docker-build docker-push IMG=ghcr.io/thedatabaseme/wal-g-exporter:latest
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: Dockerfile
+          push: ${{ github.ref_type == 'tag' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
