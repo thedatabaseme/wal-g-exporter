@@ -109,6 +109,12 @@ An example log output of wal-g-exporter looks like this:
 2023-05-06 10:12:49,508 - All metrics collected. Waiting for next update cycle...
 ```
 
+## Grafana dashboard
+---
+
+An example dashboard can be found under `grafana/dashboard.json`. Here is an example how it looks like:
+![alt text](assets/grafana_dashboard.png "Grafana dashboard")
+
 # Disclaimer
 ---
 
