@@ -549,7 +549,7 @@
               "uid": "${datasource}"
             },
             "editorMode": "code",
-            "expr": "(time()-walg_newest_basebackup{instance='$instance'})/60/24",
+            "expr": "(time()-walg_newest_basebackup{instance='$instance'})/60/60/24",
             "legendFormat": "__auto",
             "range": true,
             "refId": "A"
@@ -618,6 +618,6 @@
     "timezone": "",
     "title": "PostgreSQL WAL-G Backup",
     "uid": "0ML78jy4z",
-    "version": 5,
+    "version": 6,
     "weekStart": ""
   }
