@@ -7,6 +7,7 @@ import argparse
 import subprocess
 import json
 import datetime
+import signal
 
 from prometheus_client import start_http_server, Gauge
 from psycopg2.extras import DictCursor
@@ -19,6 +20,13 @@ if args.debug:
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 else:
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+
+terminate = False;
+
+def signal_handler(sig, frame):
+    global terminate
+    logging.info('SIGTERM received, preparing to shut down...')
+    terminate = True
 
 # Class definition
 class Exporter():
@@ -207,6 +215,9 @@ if __name__ == '__main__':
     logging.info("Startup...")
     logging.info('My PID is: %s', os.getpid())
 
+    # Register the signal handler for SIGTERM
+    signal.signal(signal.SIGTERM, signal_handler)
+
     logging.info("Reading environment configuration")
 
     # Read the configuration
@@ -232,6 +243,11 @@ if __name__ == '__main__':
     # Check if this is a primary instance
     # with while True and try catch this is how reconnect already should work.
     while True:
+
+        if terminate:
+            logging.info("Received SIGTERM, shutting down...")
+            break
+
         try:
             with psycopg2.connect(
                 host = pg_host,
@@ -283,6 +299,9 @@ if __name__ == '__main__':
                         raise Exception(
                             "Unable to execute SELECT NOT pg_is_in_recovery()" + str(e))
         except Exception as e:
+            if terminate:
+                logging.info("Received SIGTERM during exception, shutting down...")
+                break
             logging.error(
                 "Error occured, retrying in 60sec..." + str(e))
             time.sleep(60)
