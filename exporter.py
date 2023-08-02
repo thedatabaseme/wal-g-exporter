@@ -228,6 +228,7 @@ if __name__ == '__main__':
     pg_database = os.getenv('PGDATABASE', 'postgres')
     pg_password = os.getenv('PGPASSWORD')
     pg_ssl_mode = os.getenv('PGSSLMODE', 'require')
+    wal_g_scrape_interval = os.getenv('WAL_G_SCRAPE_INTERVAL', 60)
     first_start = True
 
     # Start up the server to expose the metrics.
@@ -281,7 +282,7 @@ if __name__ == '__main__':
 
                             logging.info(
                                 "All metrics collected. Waiting for next update cycle...")
-                            time.sleep(60)
+                            time.sleep(wal_g_scrape_interval)
                         else:
                             # If the exporter had run before and run on a replica suddenly, there was
                             # potentially a failover. So we kill our own process and start from scratch
@@ -292,7 +293,7 @@ if __name__ == '__main__':
 
                             logging.info(
                                 "Running on replica, waiting for promotion...")
-                            time.sleep(60)
+                            time.sleep(wal_g_scrape_interval)
                     except Exception as e:
                         logging.error(
                             "Unable to execute SELECT NOT pg_is_in_recovery()")
@@ -304,4 +305,4 @@ if __name__ == '__main__':
                 break
             logging.error(
                 "Error occured, retrying in 60sec..." + str(e))
-            time.sleep(60)
+            time.sleep(wal_g_scrape_interval)
