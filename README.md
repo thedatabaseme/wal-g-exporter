@@ -28,15 +28,16 @@ environment variables (e.g. `AWS_ACCESS_KEY_ID`, `AWS_ENDPOINT`...). The entrypo
 
 The following environment variables can be used to configure wal-g-exporter.
 
-| Variable name | description                                                                    | default value |
-| ------------- | ------------------------------------------------------------------------------ | ------------- |
-| HTTP_PORT     | Port on which the http process of wal-g-exporter will run on to expose metrics | `9351`        |
-| PGHOST        | Hostname or IP of the Postgres instance to monitor metrics on                  | `localhost`   |
-| PGPORT        | Port of the Postgres instance to monitor metrics on                            | `5432`        |
-| PGUSER        | Username with which to connect to the Postgres instance                        | `postgres`    |
-| PGDATABASE    | Database name of the Postgres instance to connect to                           | `postgres`    |
-| PGPASSWORD    | Password of the above configured user                                          |               |
-| PGSSLMODE     | SSL mode of the Postgres connection                                            | `require`     |
+| Variable name         | description                                                                    | default value |
+| --------------------- | ------------------------------------------------------------------------------ | ------------- |
+| HTTP_PORT             | Port on which the http process of wal-g-exporter will run on to expose metrics | `9351`        |
+| PGHOST                | Hostname or IP of the Postgres instance to monitor metrics on                  | `localhost`   |
+| PGPORT                | Port of the Postgres instance to monitor metrics on                            | `5432`        |
+| PGUSER                | Username with which to connect to the Postgres instance                        | `postgres`    |
+| PGDATABASE            | Database name of the Postgres instance to connect to                           | `postgres`    |
+| PGPASSWORD            | Password of the above configured user                                          |               |
+| PGSSLMODE             | SSL mode of the Postgres connection                                            | `require`     |
+| WAL_G_SCRAPE_INTERVAL | Scrape interval of the exporter                                                | `60`          |
 
 ## Running as a sidecar with Spilo
 ---
