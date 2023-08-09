@@ -18,7 +18,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/thedatabaseme/wal-g-exporter
+          images: ghcr.io/epollia/wal-g-exporter
           flavor: latest=true
           tags: |
             type=ref,event=branch
