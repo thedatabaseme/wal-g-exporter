@@ -221,14 +221,14 @@ if __name__ == '__main__':
     logging.info("Reading environment configuration")
 
     # Read the configuration
-    http_port = os.getenv('HTTP_PORT', 9351)
+    http_port = int(os.getenv('HTTP_PORT', 9351))
     pg_host = os.getenv('PGHOST', 'localhost')
     pg_port = os.getenv('PGPORT', '5432')
     pg_user = os.getenv('PGUSER', 'postgres')
     pg_database = os.getenv('PGDATABASE', 'postgres')
     pg_password = os.getenv('PGPASSWORD')
     pg_ssl_mode = os.getenv('PGSSLMODE', 'require')
-    wal_g_scrape_interval = os.getenv('WAL_G_SCRAPE_INTERVAL', 60)
+    wal_g_scrape_interval = int(os.getenv('WAL_G_SCRAPE_INTERVAL', 60))
     first_start = True
 
     # Start up the server to expose the metrics.
