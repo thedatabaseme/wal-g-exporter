@@ -36,7 +36,7 @@ RUN apt-get update && \
 RUN cd /usr/bin/ && \
     tar -zxvf wal-g-pg-ubuntu-20.04.tar.gz && \
     rm wal-g-pg-ubuntu-20.04.tar.gz && \
-    mv wal-g-pg-ubuntu-20.04-* wal-g
+    (mv wal-g-pg-ubuntu20.04-* wal-g || mv wal-g-pg-ubuntu-20.04-* wal-g)
 
 COPY scripts/entrypoint.sh /usr/bin/
 RUN chmod +x /usr/bin/entrypoint.sh
