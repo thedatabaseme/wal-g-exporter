@@ -1,3 +1,4 @@
+# Build exporter
 FROM python:3.9.16-bullseye AS exporter-builder
 
 WORKDIR /usr/src/
