@@ -1,8 +1,8 @@
-# Build exporter
 FROM python:3.9.16-bullseye AS exporter-builder
 
 WORKDIR /usr/src/
 
+# Install exporter requirements and build
 COPY requirements.txt /usr/src/
 RUN pip3 install -r requirements.txt
 ADD exporter.py /usr/src/
@@ -10,11 +10,10 @@ RUN pyinstaller --name exporter \
     --onefile exporter.py && \
     mv dist/exporter wal-g-prometheus-exporter
 
-# Download wal-g
-FROM debian:11.6-slim as downloader
+# Install wget and download wal-g
 ARG TARGETARCH
-RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/* && \
+    if [ "${TARGETARCH}" = "arm64" ]; then \
     export WALG_ARCH="aarch64"; \
     else \
     export WALG_ARCH="${TARGETARCH}"; \
@@ -24,7 +23,7 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 # Build final image
 FROM debian:11.6-slim
 COPY --from=exporter-builder /usr/src/wal-g-prometheus-exporter /usr/bin/
-COPY --from=downloader /wal-g-pg-ubuntu-20.04.tar.gz /usr/bin/
+COPY --from=exporter-builder /wal-g-pg-ubuntu-20.04.tar.gz /usr/bin/
 
 RUN apt-get update && \
     apt-get install -y ca-certificates daemontools && \
