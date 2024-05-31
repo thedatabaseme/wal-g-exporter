@@ -18,63 +18,45 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--debug", help="enable debug log", action="store_true")
 args = parser.parse_args()
 if args.debug:
-    logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.DEBUG)
+    logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 else:
-    logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
-terminate = False
-
+terminate = False;
 
 def signal_handler(sig, frame):
     global terminate
-    logging.info("SIGTERM received, preparing to shut down...")
+    logging.info('SIGTERM received, preparing to shut down...')
     terminate = True
 
-
 # Class definition
-class Exporter:
+class Exporter():
     def __init__(self):
-        self.basebackup_count = Gauge(
-            "walg_basebackup_count", "Remote Basebackups count"
-        )
-        self.oldest_basebackup = Gauge("walg_oldest_basebackup", "oldest full backup")
-        self.newest_basebackup = Gauge("walg_newest_basebackup", "newest full backup")
-        self.last_basebackup_duration = Gauge(
-            "walg_last_basebackup_duration",
-            "Duration of the last basebackup in seconds",
-        )
-        self.last_basebackup_throughput = Gauge(
-            "walg_last_basebackup_throughput_bytes",
-            "Show the throuhput in bytes per second for the last backup",
-        )
-        self.wal_archive_count = Gauge("walg_wal_archive_count", "Archived WAL count")
-        self.wal_archive_missing_count = Gauge(
-            "walg_wal_archive_missing_count", "Missing WAL count"
-        )
-        self.wal_integrity_status = Gauge(
-            "walg_wal_integrity_status",
-            "Overall WAL archive integrity status",
-            ["status"],
-        )
-        self.last_upload = Gauge(
-            "walg_last_upload", "Last upload of incremental or full backup", ["type"]
-        )
-        self.s3_total_files = Gauge(
-            "walg_s3_total_files", "Total number of files in S3 storage"
-        )
-        self.s3_diskusage = Gauge("walg_s3_diskusage", "Usage of S3 storage in bytes")
+        self.basebackup_count = Gauge('walg_basebackup_count', 'Remote Basebackups count')
+        self.oldest_basebackup = Gauge('walg_oldest_basebackup', 'oldest full backup')
+        self.newest_basebackup = Gauge('walg_newest_basebackup', 'newest full backup')
+        self.last_basebackup_duration = Gauge('walg_last_basebackup_duration',
+                                          'Duration of the last basebackup in seconds')
+        self.last_basebackup_throughput = Gauge('walg_last_basebackup_throughput_bytes',
+                                                'Show the throuhput in bytes per second for the last backup')
+        self.wal_archive_count = Gauge('walg_wal_archive_count', 'Archived WAL count')
+        self.wal_archive_missing_count = Gauge('walg_wal_archive_missing_count', 'Missing WAL count')
+        self.wal_integrity_status = Gauge('walg_wal_integrity_status', 'Overall WAL archive integrity status',
+                                          ['status'])
+        self.last_upload = Gauge('walg_last_upload', 'Last upload of incremental or full backup',
+                                 ['type'])
+        self.s3_total_files = Gauge('walg_s3_total_files', 'Total number of files in S3 storage')
+        self.s3_diskusage = Gauge('walg_s3_diskusage', 'Usage of S3 storage in bytes')
 
     # Fetch current basebackups located on S3
     def update_basebackup(self):
 
-        logging.info("Updating basebackup metrics...")
+        logging.info('Updating basebackup metrics...')
         try:
             # Fetch remote backup list
-            res = subprocess.run(
-                ["wal-g", "backup-list", "--detail", "--json"],
-                capture_output=True,
-                check=True,
-            )
+            res = subprocess.run(["wal-g", "backup-list",
+                                  "--detail", "--json"],
+                                 capture_output=True, check=True)
 
         except subprocess.CalledProcessError as e:
             logging.error(str(e))
@@ -83,39 +65,21 @@ class Exporter:
             basebackup_list = []
         else:
             basebackup_list = list(json.loads(res.stdout))
-            basebackup_list.sort(key=lambda basebackup: basebackup["start_time"])
+            basebackup_list.sort(key=lambda basebackup: basebackup['start_time'])
 
         # Update backup list and export metrics
-        if len(basebackup_list) > 0:
-            logging.info(
-                "%s basebackups found (first: %s, last: %s)",
-                len(basebackup_list),
-                basebackup_list[0]["start_time"],
-                basebackup_list[len(basebackup_list) - 1]["start_time"],
-            )
-
+        if (len(basebackup_list) > 0):
+            logging.info("%s basebackups found (first: %s, last: %s)",
+                    len(basebackup_list),
+                     basebackup_list[0]['start_time'],
+                     basebackup_list[len(basebackup_list) - 1]['start_time'])
+            
             # We need to convert the start_time to a timestamp
-            oldest_basebackup_timestamp = datetime.datetime.strptime(
-                basebackup_list[0]["start_time"], "%Y-%m-%dT%H:%M:%S.%fZ"
-            ).timestamp()
-            newest_basebackup_timestamp = datetime.datetime.strptime(
-                basebackup_list[len(basebackup_list) - 1]["start_time"],
-                "%Y-%m-%dT%H:%M:%S.%fZ",
-            ).timestamp()
-            last_basebackup_duration = (
-                datetime.datetime.strptime(
-                    basebackup_list[len(basebackup_list) - 1]["finish_time"],
-                    "%Y-%m-%dT%H:%M:%S.%fZ",
-                ).timestamp()
-                - datetime.datetime.strptime(
-                    basebackup_list[len(basebackup_list) - 1]["start_time"],
-                    "%Y-%m-%dT%H:%M:%S.%fZ",
-                ).timestamp()
-            )
-            last_basebackup_throughput = (
-                basebackup_list[len(basebackup_list) - 1]["compressed_size"]
-                / last_basebackup_duration
-            )
+            oldest_basebackup_timestamp = datetime.datetime.strptime(basebackup_list[0]['start_time'], "%Y-%m-%dT%H:%M:%S.%fZ").timestamp()
+            newest_basebackup_timestamp = datetime.datetime.strptime(basebackup_list[len(basebackup_list) - 1]['start_time'], "%Y-%m-%dT%H:%M:%S.%fZ").timestamp()
+            last_basebackup_duration = datetime.datetime.strptime(basebackup_list[len(basebackup_list) - 1]['finish_time'], "%Y-%m-%dT%H:%M:%S.%fZ").timestamp(
+                ) - datetime.datetime.strptime(basebackup_list[len(basebackup_list) - 1]['start_time'], "%Y-%m-%dT%H:%M:%S.%fZ").timestamp()
+            last_basebackup_throughput = basebackup_list[len(basebackup_list) - 1]['compressed_size'] / last_basebackup_duration
 
             logging.info("Last basebackup duration: %s", last_basebackup_duration)
 
@@ -123,11 +87,11 @@ class Exporter:
             self.basebackup_count.set(len(basebackup_list))
             self.oldest_basebackup.set(oldest_basebackup_timestamp)
             self.newest_basebackup.set(newest_basebackup_timestamp)
-            self.last_upload.labels("basebackup").set(newest_basebackup_timestamp)
+            self.last_upload.labels('basebackup').set(newest_basebackup_timestamp)
             self.last_basebackup_duration.set(last_basebackup_duration)
             self.last_basebackup_throughput.set(last_basebackup_throughput)
 
-            logging.info("Finished updating basebackup metrics...")
+            logging.info('Finished updating basebackup metrics...')
         else:
             logging.info("No basebackups found")
             self.basebackup_count.set(0)
@@ -137,14 +101,11 @@ class Exporter:
     # Fetch WAL archives located on S3
     def update_wal_archive(self):
 
-        logging.info("Updating WAL archive metrics...")
+        logging.info('Updating WAL archive metrics...')
         try:
             # Fetch remote archive list
-            res = subprocess.run(
-                ["wal-g", "wal-verify", "integrity", "--json"],
-                capture_output=True,
-                check=True,
-            )
+            res = subprocess.run(["wal-g", "wal-verify", "integrity", "--json"],
+                                 capture_output=True, check=True)
 
         except subprocess.CalledProcessError as e:
             logging.error(str(e))
@@ -155,77 +116,69 @@ class Exporter:
             wal_archive_integrity_status = []
         else:
             wal_archive_list = list(json.loads(res.stdout)["integrity"]["details"])
-            wal_archive_list.sort(key=lambda walarchive: walarchive["timeline_id"])
+            wal_archive_list.sort(key=lambda walarchive: walarchive['timeline_id'])
             wal_archive_integrity_status = json.loads(res.stdout)["integrity"]["status"]
 
         wal_archive_count = 0
         wal_archive_missing_count = 0
 
-        if len(wal_archive_list) > 0:
+        if (len(wal_archive_list) > 0):
             # Update WAL archive list and export metrics
             # Count found and missing WAL archives
             for timelines in wal_archive_list:
-                if timelines["status"] == "FOUND":
-                    wal_archive_count = wal_archive_count + timelines["segments_count"]
+                if timelines['status'] == 'FOUND':
+                    wal_archive_count = wal_archive_count + timelines['segments_count']
                 else:
-                    wal_archive_missing_count = (
-                        wal_archive_missing_count + timelines["segments_count"]
-                    )
+                    wal_archive_missing_count = wal_archive_missing_count + timelines['segments_count']
 
             # Get archive status from database
             archive_status = self.get_archive_status()
 
             # Log WAL informations
             logging.info("WAL integrity status is: %s", wal_archive_integrity_status)
-            logging.info(
-                "Found %s WAL archives in %s timelines, %s WAL archives missing",
-                wal_archive_count,
-                len(wal_archive_list),
-                wal_archive_missing_count,
-            )
-
+            logging.info("Found %s WAL archives in %s timelines, %s WAL archives missing",
+                         wal_archive_count, len(wal_archive_list), wal_archive_missing_count)
+            
             # Update all WAL related metrics
             # Check for the integrity status and set the metrics accordingly
-            if wal_archive_integrity_status == "OK":
-                self.wal_integrity_status.labels("OK").set(1)
-                self.wal_integrity_status.labels("FAILURE").set(0)
+            if wal_archive_integrity_status == 'OK':
+                self.wal_integrity_status.labels('OK').set(1)
+                self.wal_integrity_status.labels('FAILURE').set(0)
             else:
-                self.wal_integrity_status.labels("OK").set(0)
-                self.wal_integrity_status.labels("FAILURE").set(1)
-
+                self.wal_integrity_status.labels('OK').set(0)
+                self.wal_integrity_status.labels('FAILURE').set(1)
+            
             self.wal_archive_count.set(wal_archive_count)
             self.wal_archive_missing_count.set(wal_archive_missing_count)
-            self.last_upload.labels("wal").set(
-                archive_status["last_archived_time"].timestamp()
-            )
+            self.last_upload.labels('wal').set(archive_status['last_archived_time'].timestamp())
 
-            logging.info("Finished updating WAL archive metrics...")
+            logging.info('Finished updating WAL archive metrics...')
         else:
             logging.info("No WAL archives found")
             self.wal_archive_count.set(0)
 
     def update_s3_disk_usage(self):
-        logging.info("Updating S3 disk usage...")
-        s3_prefix = os.getenv("WALG_S3_PREFIX", os.getenv("WALE_S3_PREFIX"))
+        logging.info('Updating S3 disk usage...')
+        s3_prefix = os.getenv('WALG_S3_PREFIX', os.getenv('WALE_S3_PREFIX'))
         if not s3_prefix:
             logging.error("S3 prefix not set in environment variables")
             return
 
-        s3_url = s3_prefix.split("s3://")[1]
-        bucket_name = s3_url.split("/")[0]
-        prefix = "/".join(s3_url.split("/")[1:])
+        s3_url = s3_prefix.split('s3://')[1]
+        bucket_name = s3_url.split('/')[0]
+        prefix = '/'.join(s3_url.split('/')[1:])
 
-        s3_client = boto3.client("s3")
+        s3_client = boto3.client('s3')
 
-        paginator = s3_client.get_paginator("list_objects_v2")
+        paginator = s3_client.get_paginator('list_objects_v2')
         total_size = 0
         total_files = 0
 
         try:
             for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
-                if "Contents" in page:
-                    for obj in page["Contents"]:
-                        total_size += obj["Size"]
+                if 'Contents' in page:
+                    for obj in page['Contents']:
+                        total_size += obj['Size']
                         total_files += 1
 
             logging.info("Total S3 disk usage in bytes: %s", total_size)
@@ -233,39 +186,34 @@ class Exporter:
             self.s3_diskusage.set(total_size)
             self.s3_total_files.set(total_files)
 
-            logging.info("Finished updating S3 metrics...")
+            logging.info('Finished updating S3 metrics...')
         except Exception as e:
             logging.error(f"Error calculating S3 disk usage: {e}")
 
     def get_archive_status(self):
-        with db_connection.cursor(
-            cursor_factory=DictCursor
-        ) as pg_archive_status_cursor:
+        with db_connection.cursor(cursor_factory=DictCursor) as pg_archive_status_cursor:
             try:
-                pg_archive_status_cursor.execute(
-                    "SELECT archived_count, failed_count, "
-                    "last_archived_wal, "
-                    "last_archived_time, "
-                    "last_failed_wal, "
-                    "last_failed_time "
-                    "FROM pg_stat_archiver"
-                )
+                pg_archive_status_cursor.execute('SELECT archived_count, failed_count, '
+                    'last_archived_wal, '
+                    'last_archived_time, '
+                    'last_failed_wal, '
+                    'last_failed_time '
+                    'FROM pg_stat_archiver')
                 pg_archive_status = pg_archive_status_cursor.fetchone()
                 if not bool(pg_archive_status) or not pg_archive_status[0]:
                     logging.warning("Cannot fetch archive status")
                 else:
                     return pg_archive_status
             except Exception as e:
-                logging.error("Unable to fetch archive status from pg_stat_archiver")
+                logging.error(
+                    "Unable to fetch archive status from pg_stat_archiver")
                 raise Exception(
-                    "Unable to fetch archive status from pg_stat_archiver" + str(e)
-                )
-
+                    "Unable to fetch archive status from pg_stat_archiver" + str(e))
 
 # Main loop
-if __name__ == "__main__":
+if __name__ == '__main__':
     logging.info("Startup...")
-    logging.info("My PID is: %s", os.getpid())
+    logging.info('My PID is: %s', os.getpid())
 
     # Register the signal handler for SIGTERM
     signal.signal(signal.SIGTERM, signal_handler)
@@ -273,15 +221,15 @@ if __name__ == "__main__":
     logging.info("Reading environment configuration")
 
     # Read the configuration
-    http_port = int(os.getenv("HTTP_PORT", 9351))
-    pg_host = os.getenv("PGHOST", "localhost")
-    pg_port = os.getenv("PGPORT", "5432")
-    pg_user = os.getenv("PGUSER", "postgres")
-    pg_database = os.getenv("PGDATABASE", "postgres")
-    pg_password = os.getenv("PGPASSWORD")
-    pg_ssl_mode = os.getenv("PGSSLMODE", "require")
-    wal_g_scrape_interval = int(os.getenv("WAL_G_SCRAPE_INTERVAL", 60))
-    s3_metrics_enabled = os.getenv("S3_METRICS_ENABLED", "true")
+    http_port = int(os.getenv('HTTP_PORT', 9351))
+    pg_host = os.getenv('PGHOST', 'localhost')
+    pg_port = os.getenv('PGPORT', '5432')
+    pg_user = os.getenv('PGUSER', 'postgres')
+    pg_database = os.getenv('PGDATABASE', 'postgres')
+    pg_password = os.getenv('PGPASSWORD')
+    pg_ssl_mode = os.getenv('PGSSLMODE', 'require')
+    wal_g_scrape_interval = int(os.getenv('WAL_G_SCRAPE_INTERVAL', 60))
+    s3_metrics_enabled = os.getenv('S3_METRICS_ENABLED', 'true')
     first_start = True
 
     # Start up the server to expose the metrics.
@@ -304,12 +252,12 @@ if __name__ == "__main__":
 
         try:
             with psycopg2.connect(
-                host=pg_host,
-                port=pg_port,
-                user=pg_user,
-                password=pg_password,
-                dbname=pg_database,
-                sslmode=pg_ssl_mode,
+                host = pg_host,
+                port = pg_port,
+                user = pg_user,
+                password = pg_password,
+                dbname = pg_database,
+                sslmode = pg_ssl_mode,
             ) as db_connection:
 
                 db_connection.autocommit = True
@@ -317,7 +265,8 @@ if __name__ == "__main__":
                     try:
                         pg_cursor.execute("SELECT NOT pg_is_in_recovery()")
                         pg_is_primary = pg_cursor.fetchone()
-                        logging.info("Is NOT in recovery mode? %s", pg_is_primary[0])
+                        logging.info("Is NOT in recovery mode? %s",
+                                     pg_is_primary[0])
 
                         if bool(pg_is_primary) and pg_is_primary[0]:
                             logging.info("Connected to primary database")
@@ -330,34 +279,32 @@ if __name__ == "__main__":
 
                             exporter.update_basebackup()
                             exporter.update_wal_archive()
-                            if s3_metrics_enabled == "true":
+                            if s3_metrics_enabled == 'true':
                                 exporter.update_s3_disk_usage()
 
                             logging.info(
-                                "All metrics collected. Waiting for next update cycle..."
-                            )
+                                "All metrics collected. Waiting for next update cycle...")
                             time.sleep(wal_g_scrape_interval)
                         else:
                             # If the exporter had run before and run on a replica suddenly, there was
                             # potentially a failover. So we kill our own process and start from scratch
                             if not first_start:
                                 logging.info(
-                                    "Potential failover detected. Clearing old metrics. Stopping exporter."
-                                )
+                                    "Potential failover detected. Clearing old metrics. Stopping exporter.")
                                 os.kill(os.getpid(), signal.SIGTERM)
 
-                            logging.info("Running on replica, waiting for promotion...")
+                            logging.info(
+                                "Running on replica, waiting for promotion...")
                             time.sleep(wal_g_scrape_interval)
                     except Exception as e:
                         logging.error(
-                            "Unable to execute SELECT NOT pg_is_in_recovery()"
-                        )
+                            "Unable to execute SELECT NOT pg_is_in_recovery()")
                         raise Exception(
-                            "Unable to execute SELECT NOT pg_is_in_recovery()" + str(e)
-                        )
+                            "Unable to execute SELECT NOT pg_is_in_recovery()" + str(e))
         except Exception as e:
             if terminate:
                 logging.info("Received SIGTERM during exception, shutting down...")
                 break
-            logging.error("Error occured, retrying in 60sec..." + str(e))
+            logging.error(
+                "Error occured, retrying in 60sec..." + str(e))
             time.sleep(wal_g_scrape_interval)
