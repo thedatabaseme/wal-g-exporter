@@ -8,6 +8,7 @@ import subprocess
 import json
 import datetime
 import signal
+import boto3
 
 from prometheus_client import start_http_server, Gauge
 from psycopg2.extras import DictCursor
@@ -44,6 +45,7 @@ class Exporter():
                                           ['status'])
         self.last_upload = Gauge('walg_last_upload', 'Last upload of incremental or full backup',
                                  ['type'])
+        self.s3_total_files = Gauge('walg_s3_total_files', 'Total number of files in S3 storage')
         self.s3_diskusage = Gauge('walg_s3_diskusage', 'Usage of S3 storage in bytes')
 
     # Fetch current basebackups located on S3
@@ -155,40 +157,38 @@ class Exporter():
             logging.info("No WAL archives found")
             self.wal_archive_count.set(0)
 
-    # Fetch S3 object list for disk usage calculation
     def update_s3_disk_usage(self):
-
         logging.info('Updating S3 disk usage...')
+        s3_prefix = os.getenv('WALG_S3_PREFIX', os.getenv('WALE_S3_PREFIX'))
+        if not s3_prefix:
+            logging.error("S3 prefix not set in environment variables")
+            return
+
+        s3_url = s3_prefix.split('s3://')[1]
+        bucket_name = s3_url.split('/')[0]
+        prefix = '/'.join(s3_url.split('/')[1:])
+
+        s3_client = boto3.client('s3')
+
+        paginator = s3_client.get_paginator('list_objects_v2')
+        total_size = 0
+        total_files = 0
+
         try:
-            # Fetch remote object list
-            res = subprocess.run(["wal-g", "st", "ls", "-r"], capture_output=True, check=True)
+            for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+                if 'Contents' in page:
+                    for obj in page['Contents']:
+                        total_size += obj['Size']
+                        total_files += 1
 
-        except subprocess.CalledProcessError as e:
-            logging.error(str(e))
-
-        # Check output of S3 ls command 
-        if res.stdout.decode("utf-8") == "":
-            s3_object_list = []
-        else:
-            s3_object_list = res.stdout.decode().split('\n')[1:]
-
-        s3_diskusage=0
-
-        # Loop through the list of all objects and count the size
-        if (len(s3_object_list) > 0):
-            for s3_object in s3_object_list:
-                if s3_object.strip():
-                    s3_object = s3_object.split(' ')
-                    s3_diskusage = s3_diskusage + int(s3_object[2])
-
-            logging.info("S3 diskusage in bytes: %s", s3_diskusage)
-
-            self.s3_diskusage.set(s3_diskusage)
+            logging.info("Total S3 disk usage in bytes: %s", total_size)
+            logging.info("Total number of files in S3: %s", total_files)
+            self.s3_diskusage.set(total_size)
+            self.s3_total_files.set(total_files)
 
             logging.info('Finished updating S3 metrics...')
-        else:
-            logging.info("No S3 objects found")
-            self.s3_diskusage.set(0)
+        except Exception as e:
+            logging.error(f"Error calculating S3 disk usage: {e}")
 
     def get_archive_status(self):
         with db_connection.cursor(cursor_factory=DictCursor) as pg_archive_status_cursor:
@@ -229,6 +229,7 @@ if __name__ == '__main__':
     pg_password = os.getenv('PGPASSWORD')
     pg_ssl_mode = os.getenv('PGSSLMODE', 'require')
     wal_g_scrape_interval = int(os.getenv('WAL_G_SCRAPE_INTERVAL', 60))
+    s3_metrics_enabled = os.getenv('S3_METRICS_ENABLED', 'true')
     first_start = True
 
     # Start up the server to expose the metrics.
@@ -278,7 +279,8 @@ if __name__ == '__main__':
 
                             exporter.update_basebackup()
                             exporter.update_wal_archive()
-                            exporter.update_s3_disk_usage()
+                            if s3_metrics_enabled == 'true':
+                                exporter.update_s3_disk_usage()
 
                             logging.info(
                                 "All metrics collected. Waiting for next update cycle...")
