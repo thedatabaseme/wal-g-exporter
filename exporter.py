@@ -23,6 +23,13 @@ else:
 
 terminate = False;
 
+re_newline = re.compile(r'(.*)\n')
+
+# iterate over re_newline regexp and return an iterator for next match
+def regiterator(arg):
+    return (i.group(1) for i in re_newline.finditer(arg))
+
+
 def signal_handler(sig, frame):
     global terminate
     logging.info('SIGTERM received, preparing to shut down...')
@@ -166,17 +173,11 @@ class Exporter():
         except subprocess.CalledProcessError as e:
             logging.error(str(e))
 
-        # Check output of S3 ls command 
-        if res.stdout.decode("utf-8") == "":
-            s3_object_list = []
-        else:
-            s3_object_list = res.stdout.decode().split('\n')[1:]
-
         s3_diskusage=0
 
         # Loop through the list of all objects and count the size
-        if (len(s3_object_list) > 0):
-            for s3_object in s3_object_list:
+        if (len(res.stdout) > 0):
+            for s3_object in regiterator(res.stdout.decode()):
                 if s3_object.strip():
                     s3_object = s3_object.split(' ')
                     s3_diskusage = s3_diskusage + int(s3_object[2])
