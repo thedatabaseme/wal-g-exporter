@@ -7,6 +7,7 @@ import argparse
 import subprocess
 import json
 import datetime
+import signal
 
 from prometheus_client import start_http_server, Gauge
 from psycopg2.extras import DictCursor
@@ -19,6 +20,13 @@ if args.debug:
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.DEBUG)
 else:
     logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+
+terminate = False;
+
+def signal_handler(sig, frame):
+    global terminate
+    logging.info('SIGTERM received, preparing to shut down...')
+    terminate = True
 
 # Class definition
 class Exporter():
@@ -207,16 +215,20 @@ if __name__ == '__main__':
     logging.info("Startup...")
     logging.info('My PID is: %s', os.getpid())
 
+    # Register the signal handler for SIGTERM
+    signal.signal(signal.SIGTERM, signal_handler)
+
     logging.info("Reading environment configuration")
 
     # Read the configuration
-    http_port = os.getenv('HTTP_PORT', 9351)
+    http_port = int(os.getenv('HTTP_PORT', 9351))
     pg_host = os.getenv('PGHOST', 'localhost')
     pg_port = os.getenv('PGPORT', '5432')
     pg_user = os.getenv('PGUSER', 'postgres')
     pg_database = os.getenv('PGDATABASE', 'postgres')
     pg_password = os.getenv('PGPASSWORD')
     pg_ssl_mode = os.getenv('PGSSLMODE', 'require')
+    wal_g_scrape_interval = int(os.getenv('WAL_G_SCRAPE_INTERVAL', 60))
     first_start = True
 
     # Start up the server to expose the metrics.
@@ -232,6 +244,11 @@ if __name__ == '__main__':
     # Check if this is a primary instance
     # with while True and try catch this is how reconnect already should work.
     while True:
+
+        if terminate:
+            logging.info("Received SIGTERM, shutting down...")
+            break
+
         try:
             with psycopg2.connect(
                 host = pg_host,
@@ -265,7 +282,7 @@ if __name__ == '__main__':
 
                             logging.info(
                                 "All metrics collected. Waiting for next update cycle...")
-                            time.sleep(60)
+                            time.sleep(wal_g_scrape_interval)
                         else:
                             # If the exporter had run before and run on a replica suddenly, there was
                             # potentially a failover. So we kill our own process and start from scratch
@@ -276,13 +293,16 @@ if __name__ == '__main__':
 
                             logging.info(
                                 "Running on replica, waiting for promotion...")
-                            time.sleep(60)
+                            time.sleep(wal_g_scrape_interval)
                     except Exception as e:
                         logging.error(
                             "Unable to execute SELECT NOT pg_is_in_recovery()")
                         raise Exception(
                             "Unable to execute SELECT NOT pg_is_in_recovery()" + str(e))
         except Exception as e:
+            if terminate:
+                logging.info("Received SIGTERM during exception, shutting down...")
+                break
             logging.error(
                 "Error occured, retrying in 60sec..." + str(e))
-            time.sleep(60)
+            time.sleep(wal_g_scrape_interval)
