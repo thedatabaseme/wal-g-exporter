@@ -1,3 +1,6 @@
 __pycache__
 .envrc
 build
+.vscode
+.idea
+.ansible
